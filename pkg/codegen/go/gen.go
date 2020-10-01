@@ -153,9 +153,36 @@ func (pkg *pkgContext) tokenToType(tok string) string {
 	contract.Assert(ok)
 
 	name = Title(name)
+	// TODO: probably need tokenToResource method that omits this
 	if modPkg.names.has(name) {
 		name += "Type"
 	}
+
+	if mod == pkg.mod {
+		return name
+	}
+	if mod == "" {
+		mod = components[0]
+	}
+	return strings.Replace(mod, "/", "", -1) + "." + name
+}
+
+func (pkg *pkgContext) tokenToResource(tok string) string {
+	// token := pkg : module : member
+	// module := path/to/module
+
+	components := strings.Split(tok, ":")
+	contract.Assert(len(components) == 3)
+	if pkg == nil {
+		panic(fmt.Errorf("pkg is nil. token %s", tok))
+	}
+	if pkg.pkg == nil {
+		panic(fmt.Errorf("pkg.pkg is nil. token %s", tok))
+	}
+
+	mod, name := pkg.tokenToPackage(tok), components[2]
+
+	name = Title(name)
 
 	if mod == pkg.mod {
 		return name
@@ -188,6 +215,8 @@ func (pkg *pkgContext) plainType(t schema.Type, optional bool) string {
 		return "map[string]" + pkg.plainType(t.ElementType, false)
 	case *schema.ObjectType:
 		typ = pkg.tokenToType(t.Token)
+	case *schema.ResourceType:
+		typ = pkg.tokenToResource(t.Token)
 	case *schema.TokenType:
 		// Use the underlying type for now.
 		if t.UnderlyingType != nil {
@@ -288,6 +317,8 @@ func (pkg *pkgContext) outputType(t schema.Type, optional bool) string {
 		return en + "MapOutput"
 	case *schema.ObjectType:
 		typ = pkg.tokenToType(t.Token)
+	case *schema.ResourceType:
+		typ = pkg.tokenToResource(t.Token)
 	case *schema.TokenType:
 		// Use the underlying type for now.
 		if t.UnderlyingType != nil {
@@ -945,6 +976,11 @@ func (pkg *pkgContext) getTypeImports(t schema.Type, recurse bool, imports strin
 				pkg.getTypeImports(p.Type, recurse, imports, seen)
 			}
 		}
+	case *schema.ResourceType:
+		mod := pkg.tokenToPackage(t.Token)
+		if mod != pkg.mod {
+			imports.add(path.Join(pkg.importBasePath, mod))
+		}
 	case *schema.UnionType:
 		for _, e := range t.ElementTypes {
 			pkg.getTypeImports(e, recurse, imports, seen)
@@ -956,6 +992,8 @@ func (pkg *pkgContext) getImports(member interface{}, imports stringSet) {
 	seen := map[schema.Type]struct{}{}
 	switch member := member.(type) {
 	case *schema.ObjectType:
+		pkg.getTypeImports(member, true, imports, seen)
+	case *schema.ResourceType:
 		pkg.getTypeImports(member, true, imports, seen)
 	case *schema.Resource:
 		for _, p := range member.Properties {
@@ -1254,7 +1292,7 @@ func LanguageResources(tool string, pkg *schema.Package) (map[string]LanguageRes
 	return resources, nil
 }
 
-func GeneratePackage(tool string, pkg *schema.Package) (map[string][]byte, error) {
+func GeneratePackage(tool string, pkg *schema.Package, extraFiles map[string][]byte) (map[string][]byte, error) {
 	if err := pkg.ImportLanguages(map[string]schema.Language{"go": Importer}); err != nil {
 		return nil, err
 	}
