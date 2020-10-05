@@ -153,7 +153,6 @@ func (pkg *pkgContext) tokenToType(tok string) string {
 	contract.Assert(ok)
 
 	name = Title(name)
-	// TODO: probably need tokenToResource method that omits this
 	if modPkg.names.has(name) {
 		name += "Type"
 	}
@@ -216,6 +215,7 @@ func (pkg *pkgContext) plainType(t schema.Type, optional bool) string {
 	case *schema.ObjectType:
 		typ = pkg.tokenToType(t.Token)
 	case *schema.ResourceType:
+		// TODO: is this right?
 		typ = pkg.tokenToResource(t.Token)
 	case *schema.TokenType:
 		// Use the underlying type for now.
@@ -264,6 +264,9 @@ func (pkg *pkgContext) inputType(t schema.Type, optional bool) string {
 		return strings.TrimSuffix(en, "Input") + "MapInput"
 	case *schema.ObjectType:
 		typ = pkg.tokenToType(t.Token)
+	case *schema.ResourceType:
+		// TODO: is this right?
+		return "pulumi.Resource"
 	case *schema.TokenType:
 		// Use the underlying type for now.
 		if t.UnderlyingType != nil {
@@ -318,7 +321,8 @@ func (pkg *pkgContext) outputType(t schema.Type, optional bool) string {
 	case *schema.ObjectType:
 		typ = pkg.tokenToType(t.Token)
 	case *schema.ResourceType:
-		typ = pkg.tokenToResource(t.Token)
+		return "pulumi.ResourceOutput"
+		//typ = pkg.tokenToResource(t.Token)
 	case *schema.TokenType:
 		// Use the underlying type for now.
 		if t.UnderlyingType != nil {

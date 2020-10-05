@@ -12,7 +12,7 @@ import (
 type OtherResource struct {
 	pulumi.CustomResourceState
 
-	Foo ResourcePtrOutput `pulumi:"foo"`
+	Foo pulumi.ResourceOutput `pulumi:"foo"`
 }
 
 // NewOtherResource registers a new resource with the given unique name, arguments, and options.
@@ -47,7 +47,7 @@ type otherResourceState struct {
 }
 
 type OtherResourceState struct {
-	Foo PtrInput
+	Foo pulumi.Resource
 }
 
 func (OtherResourceState) ElementType() reflect.Type {
@@ -60,7 +60,7 @@ type otherResourceArgs struct {
 
 // The set of arguments for constructing a OtherResource resource.
 type OtherResourceArgs struct {
-	Foo PtrInput
+	Foo pulumi.Resource
 }
 
 func (OtherResourceArgs) ElementType() reflect.Type {
