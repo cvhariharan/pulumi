@@ -25,18 +25,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func await(out Output) (interface{}, bool, bool, error) {
+func await(out Output) (interface{}, bool, bool, []Resource, error) {
 	return out.await(context.Background())
 }
 
 func assertApplied(t *testing.T, out Output) {
-	_, known, _, err := await(out)
+	_, known, _, _, err := await(out)
 	assert.True(t, known)
 	assert.Nil(t, err)
 }
 
 func newIntOutput() IntOutput {
-	return IntOutput{newOutputState(reflect.TypeOf(42))}
+	return IntOutput{newOutputState(reflect.TypeOf(42), nil)}
 }
 
 func TestBasicOutputs(t *testing.T) {
@@ -46,10 +46,11 @@ func TestBasicOutputs(t *testing.T) {
 		go func() {
 			resolve(42)
 		}()
-		v, known, secret, err := await(out)
+		v, known, secret, deps, err := await(out)
 		assert.Nil(t, err)
 		assert.True(t, known)
 		assert.False(t, secret)
+		assert.Nil(t, deps)
 		assert.NotNil(t, v)
 		assert.Equal(t, 42, v.(int))
 	}
@@ -58,16 +59,16 @@ func TestBasicOutputs(t *testing.T) {
 		go func() {
 			reject(errors.New("boom"))
 		}()
-		v, _, _, err := await(out)
+		v, _, _, _, err := await(out)
 		assert.NotNil(t, err)
 		assert.Nil(t, v)
 	}
 }
 
 func TestArrayOutputs(t *testing.T) {
-	out := ArrayOutput{newOutputState(reflect.TypeOf([]interface{}{}))}
+	out := ArrayOutput{newOutputState(reflect.TypeOf([]interface{}{}), nil)}
 	go func() {
-		out.resolve([]interface{}{nil, 0, "x"}, true, false)
+		out.resolve([]interface{}{nil, 0, "x"}, true, false, nil)
 	}()
 	{
 		assertApplied(t, out.ApplyT(func(arr []interface{}) (interface{}, error) {
@@ -83,9 +84,9 @@ func TestArrayOutputs(t *testing.T) {
 }
 
 func TestBoolOutputs(t *testing.T) {
-	out := BoolOutput{newOutputState(reflect.TypeOf(false))}
+	out := BoolOutput{newOutputState(reflect.TypeOf(false), nil)}
 	go func() {
-		out.resolve(true, true, false)
+		out.resolve(true, true, false, nil)
 	}()
 	{
 		assertApplied(t, out.ApplyT(func(v bool) (interface{}, error) {
@@ -96,13 +97,13 @@ func TestBoolOutputs(t *testing.T) {
 }
 
 func TestMapOutputs(t *testing.T) {
-	out := MapOutput{newOutputState(reflect.TypeOf(map[string]interface{}{}))}
+	out := MapOutput{newOutputState(reflect.TypeOf(map[string]interface{}{}), nil)}
 	go func() {
 		out.resolve(map[string]interface{}{
 			"x": 1,
 			"y": false,
 			"z": "abc",
-		}, true, false)
+		}, true, false, nil)
 	}()
 	{
 		assertApplied(t, out.ApplyT(func(v map[string]interface{}) (interface{}, error) {
@@ -116,9 +117,9 @@ func TestMapOutputs(t *testing.T) {
 }
 
 func TestNumberOutputs(t *testing.T) {
-	out := Float64Output{newOutputState(reflect.TypeOf(float64(0)))}
+	out := Float64Output{newOutputState(reflect.TypeOf(float64(0)), nil)}
 	go func() {
-		out.resolve(42.345, true, false)
+		out.resolve(42.345, true, false, nil)
 	}()
 	{
 		assertApplied(t, out.ApplyT(func(v float64) (interface{}, error) {
@@ -129,9 +130,9 @@ func TestNumberOutputs(t *testing.T) {
 }
 
 func TestStringOutputs(t *testing.T) {
-	out := StringOutput{newOutputState(reflect.TypeOf(""))}
+	out := StringOutput{newOutputState(reflect.TypeOf(""), nil)}
 	go func() {
-		out.resolve("a stringy output", true, false)
+		out.resolve("a stringy output", true, false, nil)
 	}()
 	{
 		assertApplied(t, out.ApplyT(func(v string) (interface{}, error) {
@@ -163,7 +164,7 @@ func TestResolveOutputToOutput(t *testing.T) {
 			resolve(other)
 			go func() { rejectOther(errors.New("boom")) }()
 		}()
-		v, _, _, err := await(out)
+		v, _, _, _, err := await(out)
 		assert.NotNil(t, err)
 		assert.Nil(t, v)
 	}
@@ -175,9 +176,10 @@ func TestToOutputStruct(t *testing.T) {
 	_, ok := out.(nestedTypeOutput)
 	assert.True(t, ok)
 
-	v, known, secret, err := await(out)
+	v, known, secret, deps, err := await(out)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, nestedType{Foo: "bar", Bar: 42}, v)
 
@@ -185,9 +187,10 @@ func TestToOutputStruct(t *testing.T) {
 	_, ok = out.(nestedTypeOutput)
 	assert.True(t, ok)
 
-	v, known, secret, err = await(out)
+	v, known, secret, deps, err = await(out)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 
 	assert.NoError(t, err)
 	assert.Equal(t, nestedType{Foo: "bar", Bar: 42}, v)
@@ -196,9 +199,10 @@ func TestToOutputStruct(t *testing.T) {
 	_, ok = out.(nestedTypeOutput)
 	assert.True(t, ok)
 
-	v, known, secret, err = await(out)
+	v, known, secret, deps, err = await(out)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, nestedType{Foo: "bar", Bar: 42}, v)
 }
@@ -236,9 +240,10 @@ func TestToOutputConvert(t *testing.T) {
 	_, ok := out.(nestedTypeOutput)
 	assert.True(t, ok)
 
-	v, known, secret, err := await(out)
+	v, known, secret, deps, err := await(out)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, nestedType{Foo: "bar", Bar: 1}, v)
 }
@@ -259,9 +264,10 @@ func TestToOutputAny(t *testing.T) {
 	_, ok := out.(AnyOutput)
 	assert.True(t, ok)
 
-	v, known, secret, err := await(out)
+	v, known, secret, deps, err := await(out)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 
 	argsV := v.(*args)
@@ -310,9 +316,10 @@ func TestToOutputInputAny(t *testing.T) {
 	_, ok := out.(AnyOutput)
 	assert.True(t, ok)
 
-	v, known, secret, err := await(out)
+	v, known, secret, deps, err := await(out)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 
 	assert.Equal(t, &args{
@@ -407,41 +414,46 @@ func TestSecretApply(t *testing.T) {
 
 func TestNil(t *testing.T) {
 	ao := Any(nil)
-	v, known, secret, err := await(ao)
+	v, known, secret, deps, err := await(ao)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, nil, v)
 
 	o := ToOutput(nil)
-	v, known, secret, err = await(o)
+	v, known, secret, deps, err = await(o)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, nil, v)
 
 	o = ToOutput(ao)
-	v, known, secret, err = await(o)
+	v, known, secret, deps, err = await(o)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, nil, v)
 
 	ao = ToOutput("").ApplyT(func(v string) interface{} {
 		return nil
 	}).(AnyOutput)
-	v, known, secret, err = await(ao)
+	v, known, secret, deps, err = await(ao)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, nil, v)
 
 	bo := ao.ApplyBool(func(x interface{}) bool {
 		return x == nil
 	})
-	v, known, secret, err = await(bo)
+	v, known, secret, deps, err = await(bo)
 	assert.True(t, known)
 	assert.False(t, secret)
+	assert.Nil(t, deps)
 	assert.NoError(t, err)
 	assert.Equal(t, true, v)
 }
