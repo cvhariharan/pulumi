@@ -1071,7 +1071,6 @@ func (mod *modContext) genPulumiHeader(w io.Writer) {
 		"System",
 		"System.Collections.Generic",
 		"System.Collections.Immutable",
-		"System.Runtime.Serialization",
 		"System.Threading.Tasks",
 		"Pulumi.Serialization",
 	})
@@ -1353,7 +1352,7 @@ func (mod *modContext) gen(fs fs) error {
 	// Enums
 	if len(mod.enums) > 0 {
 		buffer := &bytes.Buffer{}
-		mod.genPulumiHeader(buffer)
+		mod.genHeader(buffer, []string{"System.Runtime.Serialization"})
 
 		if err := mod.genEnums(buffer, mod.enums); err != nil {
 			return err
