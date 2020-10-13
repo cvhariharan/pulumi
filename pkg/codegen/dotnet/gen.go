@@ -1071,6 +1071,7 @@ func (mod *modContext) genPulumiHeader(w io.Writer) {
 		"System",
 		"System.Collections.Generic",
 		"System.Collections.Immutable",
+		"System.Runtime.Serialization",
 		"System.Threading.Tasks",
 		"Pulumi.Serialization",
 	})
